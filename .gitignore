@@ -1,0 +1,17 @@
+# 依赖与构建中间产物
+node_modules/
+*.log
+
+# 上游参考仓库（克隆用于分析，不入库）
+upstream/
+
+# 测试临时产物
+dist/_smoke.mjs
+dist/_dbg.mjs
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
