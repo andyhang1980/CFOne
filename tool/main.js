@@ -234,7 +234,7 @@ function buildWorkerBundle() {
 
 async function deployWorkers(token, accountId, password) {
   info("创建 KV 命名空间...");
-  const kv = await cf(token, "POST", "/accounts/" + accountId + "/kv/namespaces", {
+  const kv = await cf(token, "POST", "/accounts/" + accountId + "/storage/kv/namespaces", {
     title: "CFOne-" + stamp(),
   });
   ok("KV: " + kv.id);
@@ -277,7 +277,7 @@ async function deployWorkers(token, accountId, password) {
 
 async function deployPages(token, accountId, password) {
   info("创建 KV 命名空间...");
-  const kv = await cf(token, "POST", "/accounts/" + accountId + "/kv/namespaces", {
+  const kv = await cf(token, "POST", "/accounts/" + accountId + "/storage/kv/namespaces", {
     title: "CFOne-" + stamp(),
   });
   ok("KV: " + kv.id);
@@ -518,7 +518,8 @@ async function runDeploy(mode, token, account, password, assumeYes) {
     bad("部署失败: " + e.message);
     say("");
     say("  排查建议:");
-    say("   - 确认 Token 有 Pages / Workers 的 Edit 或 Admin 权限");
+    say("   - 10404 No route for that URI = API 路径或版本不对（旧版 exe 常见），请更新 CFOne.exe");
+    say("   - 确认 Token 有 Pages / Workers 的 Edit 或 Admin 权限（见 README「API Token 权限清单」）");
     say("   - 确认账号未超出免费版 KV / Workers 数量限制");
     say("   - 网络问题可开代理后重试");
     return null;
