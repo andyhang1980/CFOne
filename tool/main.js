@@ -84,10 +84,19 @@ function printHelp() {
   say("  --password <PW>         面板密码，8-64 位字母数字 . _ -（留空自动生成）");
   say("  --yes                   跳过确认提示");
   say("");
-  say("Token 需要权限（Account 级）:");
-  say("  Account Settings: Read");
-  say("  Workers KV Storage: Edit");
-  say("  Pages: Edit（pages 模式） / Workers: Admin（workers 模式）");
+  say("Token 创建（控制台 → 头像 → Profile & Preferences → API Tokens）:");
+  say("  ① 作用域必须选 [Account 账号级]，别选 Zone 域名级（Zone 看不到下面权限）");
+  say("  ② 推荐用官方模板: Edit Cloudflare Workers（Workers 模式）");
+  say("                  或 Edit Cloudflare Pages（Pages 模式）");
+  say("  ③ 或自定义 Token，勾以下四项（Account 作用域下）:");
+  say("    Account Settings      Read");
+  say("    Workers KV Storage    Edit");
+  say("    Workers               Admin（Workers 模式）");
+  say("    Pages                 Edit（Pages 模式）");
+  say("");
+  say("  明确不需要: DNS / Workers Routes / Access / WAF（工具不碰自定义域名）");
+  say("  创建页: https://dash.cloudflare.com/profile/api-tokens");
+  say("  详细步骤见 README「API Token 权限清单」");
   say("");
 }
 
@@ -484,9 +493,12 @@ async function runDeploy(mode, token, account, password, assumeYes) {
   } catch (e) {
     bad("Token 校验失败: " + e.message);
     say("");
-    say("  常见原因:");
-    say("   - Token 权限不足，需勾选 Account Settings: Read / Workers KV Storage: Edit");
-    say("   - 网络无法访问 api.cloudflare.com（可先开代理再试）");
+    say("  常见原因与排查:");
+    say("   - 权限不足: 需勾 Account Settings:Read / Workers KV Storage:Edit");
+    say("               Workers 模式另需 Workers:Admin，Pages 模式另需 Pages:Edit");
+    say("               完整清单见 README「API Token 权限清单」");
+    say("   - Token 是 GitHub 的(ghp_ 开头) 或粘贴错误: 需 Cloudflare API Token");
+    say("   - 网络无法访问 api.cloudflare.com: 可先开代理再试");
     return null;
   }
 

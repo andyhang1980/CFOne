@@ -115,31 +115,33 @@ log("       OK  " + (readFileSync(SRC_OUT, "utf8").length / 1024).toFixed(1) + "
 
 /* 4. pkg 打包 */
 log("[4/4] 打包 exe ...");
-if (existsSync(OUT_EXE)) {
-  try { rmSync(OUT_EXE); } catch (e) { /* ignore */ }
-}
+
+// 输出到临时名再改名，避免目标文件被占用时 pkg 直接失败（Windows 上 exe 可能正被运行）
+const tmpOut = OUT_EXE.replace(/\.exe$/, ".exe.tmp" + Date.now().toString(36));
 
 const attempts = [
+  // 优先用 pkg + node18（PKG_CACHE_PATH 通常已有缓存，最快最稳）
   {
-    name: "@yao-pkg/pkg",
-    args: [
-      join(ROOT, "tool", "package.json"),
-      "--targets", "node20-win-x64",
-      "--output", OUT_EXE,
-    ],
-  },
-  {
-    // 老版 pkg 只支持到 node18
     name: "pkg",
     args: [
       join(ROOT, "tool", "package.json"),
       "--targets", "node18-win-x64",
-      "--output", OUT_EXE,
+      "--output", tmpOut,
+    ],
+  },
+  {
+    // node20 常需从源码构建（环境缺 patch 工具会失败），作为兜底
+    name: "@yao-pkg/pkg",
+    args: [
+      join(ROOT, "tool", "package.json"),
+      "--targets", "node20-win-x64",
+      "--output", tmpOut,
     ],
   },
 ];
 
 let packed = false;
+let builtFile = null;
 for (const a of attempts) {
   log("       尝试 " + a.name + " ...");
   const r = spawnSync("npx", ["-y", a.name, ...a.args], {
@@ -148,18 +150,38 @@ for (const a of attempts) {
     shell: process.platform === "win32",
     timeout: 600000,
   });
-  if (r.status === 0 && existsSync(OUT_EXE)) {
+  // pkg 对 --output 的 .tmp 后缀可能追加 .exe，两种候选都查
+  const candidates = [tmpOut, tmpOut + ".exe"];
+  builtFile = candidates.find((p) => existsSync(p));
+  if (r.status === 0 && builtFile) {
     packed = true;
     break;
   }
   log("       " + a.name + " 未成功（status=" + r.status + "），换下一个");
 }
 
-if (!packed || !existsSync(OUT_EXE)) {
+if (!packed || !builtFile) {
   fail(
     "exe 打包失败。可改用 Node 直接运行：node tool/main.js\n" +
-      "或手动执行：npx -y @yao-pkg/pkg tool/package.json -t node20-win-x64 -o dist/CFOne.exe"
+      "或手动执行：npx -y pkg tool/package.json -t node18-win-x64 -o dist/CFOne.exe.tmp"
   );
+}
+
+// 用临时产物覆盖目标（若目标被占用则提示）
+try {
+  rmSync(OUT_EXE, { force: true });
+} catch (e) {
+  fail("无法覆盖 dist/CFOne.exe（文件可能正被运行）。请关闭所有 CFOne.exe 窗口后重试。");
+}
+try {
+  require("fs").renameSync(builtFile, OUT_EXE);
+} catch (e) {
+  try {
+    require("fs").copyFileSync(builtFile, OUT_EXE);
+    require("fs").rmSync(builtFile, { force: true });
+  } catch (e2) {
+    fail("复制产物失败: " + e2.message);
+  }
 }
 
 const size = readFileSync(OUT_EXE).length;

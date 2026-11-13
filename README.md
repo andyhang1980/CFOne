@@ -14,6 +14,110 @@
 | **出站** | 直连 / ProxyIP 竞速、SOCKS5 / HTTP / HTTPS 代理、出站方式三选一（竞速/直连优先/只走代理）；Path 级 `pyip` / `s` / `qj` 单节点覆盖 |
 | **面板** | 图形化管理：UUID、WS 路径、Trojan 开关、ProxyIP、出站代理、优选 IP 列表（KV 持久化）、伪装页 |
 
+## API Token 权限清单
+
+exe 工具通过 Cloudflare REST API 部署，需要创建一个 **Account 级（账号作用域）API Token**。
+本节把**作用域、创建入口、模板选择、权限项位置**全部写明，照着做即可。
+
+### 一、作用域：必须选 Account（账号级）
+
+创建 Token 时，控制台会让你选 **作用域（Scope）**，这一步最关键，**选错后面全找不到权限**：
+
+| 作用域 | 能管什么 | 能不能用本工具 |
+| --- | --- | --- |
+| **Account（账号级）** ✅ | 整个 Cloudflare 账号：所有域名、Workers、Pages、KV、DNS…… | **能**。本工具调的是账号级 API（`/accounts/...`），必须用 Account 级 |
+| **Zone（域名级）** ❌ | 只能管某一个已接入的域名（DNS、WAF、SSL 等） | **不能**。Zone 级 Token 看不到 Account Settings / Workers / Pages 这些账号级权限，用它会报「权限不足」 |
+
+**结论：作用域选 `Account`，不是 `Zone`。** 选 Zone 的话，下面表格里的 Account Settings、Workers、Pages 这些权限项根本不会出现，工具会一直报权限错误。
+
+### 二、创建入口（控制台路径）
+
+两条路，任选其一：
+
+1. **直达链接**：https://dash.cloudflare.com/profile/api-tokens
+2. **菜单路径**：Cloudflare 控制台 → 右上角**头像** → **Profile & Preferences** → 左侧 **API Tokens**
+
+进入后点 **Create Token**，进入创建向导。
+
+### 三、模板选择：推荐用官方模板，最省事
+
+创建向导里会让你选权限来源，有三种，推荐第一种：
+
+**方式 A：用官方模板（推荐，一键勾好，不用自己找权限项）**
+
+创建向导里选 **Use template**，然后挑：
+
+| 模板名 | 包含的权限 | 适合 |
+| --- | --- | --- |
+| **Edit Cloudflare Workers** | Account Settings: Read + Workers: Admin（含 KV、脚本创建/编辑/部署） | **Workers 模式**，勾这个就够，无需再改 |
+| **Edit Cloudflare Pages** | Account Settings: Read + Pages: Edit | **Pages 模式**，勾这个就够 |
+| **Edit Cloudflare Workers + Pages**（若存在） | 两者合并 | 想两种模式都能用 |
+
+> 如果向导里没有「Edit Cloudflare Pages」模板，或想一次覆盖两种模式，用下面的**自定义 Token**，勾选「推荐四项」即可。
+
+**方式 B：自定义 Token（Create Custom Token）**
+
+向导里选 **Create Custom Token → Get started**，然后**按作用域 Account** 勾选权限。
+每个权限项在权限编辑器里的位置（左侧分类 → 权限项）：
+
+| 权限项（控制台显示名） | 级别 | 分类位置 | 用途 |
+| --- | --- | --- | --- |
+| **Account Settings** | Read | Account（无子分类，直接列） | 读账号列表，工具自动选账号 |
+| **Workers KV Storage** | Edit | Developer Platform | 创建 KV 命名空间 |
+| **Workers** | Admin | Developer Platform | Workers 模式：建脚本、传代码、部署 |
+| **Pages** | Edit | Developer Platform | Pages 模式：建项目、写配置、传资源、建部署 |
+
+勾选位置示意（自定义 Token 的权限编辑器）：
+```
+[Account Settings]        → Read      ✅  ← 直接勾选，无分类
+[Developer Platform] ▾
+   ├─ [Workers KV Storage] → Edit   ✅  ← 勾这个
+   ├─ [Workers]            → Admin  ✅  ← 勾这个（Workers 模式）
+   └─ [Pages]              → Edit   ✅  ← 勾这个（Pages 模式）
+```
+
+**推荐四项全勾**（Account Settings: Read + Workers KV Storage: Edit + Workers: Admin + Pages: Edit），Workers 和 Pages 两种模式都能用，不会出现某个 API 没权限。
+
+### 四、可选权限（不勾不影响部署）
+
+| 权限项 | 级别 | 用途 |
+| --- | --- | --- |
+| **Account API Tokens** | Read | 只用于查看 Token 有效期，工具不读 |
+| **Account Analytics** | Read | 只用于面板显示用量/额度，工具不读 |
+
+### 五、明确不需要的权限
+
+- **DNS** —— 工具不碰自定义域名的 DNS 记录，Workers 模式的自定义域名请在控制台手动绑定
+- **Workers Routes** —— 工具用脚本内容上传 + 自动部署，不走 Routes
+- **Cloudflare Access / WAF / Load Balancing 等** —— 完全无关
+
+### 六、工具调用的 API 与对应权限
+
+| 工具操作 | 调用的 API | 所需权限 |
+| --- | --- | --- |
+| 自动选账号 | `GET /accounts` | Account Settings: Read |
+| 建 KV 命名空间 | `POST /accounts/{id}/kv/namespaces` | Workers KV Storage: Edit |
+| Workers 部署 | `PUT /accounts/{id}/workers/scripts/{name}/content`（代码+绑定+变量一次） | Workers: Admin（或 Workers Script: Create+Edit） |
+| Pages 建项目 | `POST /accounts/{id}/pages/projects` | Pages: Edit |
+| Pages 写配置（A/KV/兼容日期） | `PATCH /accounts/{id}/pages/projects/{name}` | Pages: Edit |
+| Pages 传占位资源 | `GET upload-token` / `POST /pages/assets/check-missing|upload|upsert-hashes` | Pages: Edit |
+| Pages 建部署 | `POST /accounts/{id}/pages/projects/{name}/deployments` | Pages: Edit |
+| 部署后校验面板 | 直接 GET `https://<地址>/<密码>`（普通 HTTP，无需 Token） | 无需权限 |
+
+### 七、完整创建步骤（照着抄）
+
+1. 打开 https://dash.cloudflare.com/profile/api-tokens
+2. 点 **Create Token**
+3. **作用域选 `Account`**（关键，别选 Zone）
+4. 选权限来源：
+   - 省事：选模板 **Edit Cloudflare Workers**（Workers 模式）或 **Edit Cloudflare Pages**（Pages 模式）
+   - 或自定义：勾「推荐四项」（见上表）
+5. 输入 Token 名称（如 `CFOne 部署`），点 **Continue to summary** → **Create Token**
+6. **立即复制 Token** —— 只显示一次，云端无法再读
+7. 在 exe 里粘贴：`CFOne.exe --mode workers --token <TOKEN>`
+
+> 提示：Token 是账号级凭据，等同于账号访问权。别公开、别截图、别写进代码仓库。怀疑泄露就删掉重建。
+
 ## 快速部署
 
 ### 方式〇：exe 工具（最省事，推荐）
