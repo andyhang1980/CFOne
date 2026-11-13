@@ -263,8 +263,23 @@ async function deployWorkers(token, accountId, password) {
   await cf(token, "PUT", "/accounts/" + accountId + "/workers/scripts/" + scriptName + "/content", fd);
   ok("Worker 已部署: " + scriptName);
 
+  // 获取账号的 workers.dev 子域，拼接完整访问地址
+  // Cloudflare 完整子域格式: <脚本名>.<账号子域>.workers.dev
+  // 短子域 <脚本名>.workers.dev 在多数账号下 DNS 不存在，会连不上（HTTP 000）
+  let subdomain = "";
+  try {
+    const acct = await cf(token, "GET", "/accounts/" + accountId);
+    subdomain = acct && acct.subdomain ? String(acct.subdomain) : "";
+  } catch (e) {
+    subdomain = "";
+  }
+  const url = subdomain
+    ? "https://" + scriptName + "." + subdomain + ".workers.dev"
+    : "https://" + scriptName + ".workers.dev";
+  if (!subdomain) warn("未能获取账号子域，使用短子域（若连不上，请在控制台查看完整地址）");
+
   return {
-    url: "https://" + scriptName + ".workers.dev",
+    url: url,
     kvId: kv.id,
     name: scriptName,
     kind: "workers",
