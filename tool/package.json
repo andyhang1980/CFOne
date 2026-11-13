@@ -1,0 +1,14 @@
+{
+  "name": "cfone-tool",
+  "version": "1.0.0",
+  "description": "CFOne 一键部署工具",
+  "main": "main.js",
+  "bin": {
+    "cfone": "main.js"
+  },
+  "pkg": {
+    "targets": ["node20-win-x64"],
+    "outputPath": "../dist"
+  },
+  "license": "AGPL-3.0"
+}

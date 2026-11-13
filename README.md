@@ -16,6 +16,64 @@
 
 ## 快速部署
 
+### 方式〇：exe 工具（最省事，推荐）
+
+双击 `CFOne.exe` 或在终端运行，全程中文交互，不用记任何命令。
+
+```bash
+# 直接运行，出现菜单
+dist\CFOne.exe
+
+# 或非交互一键部署
+dist\CFOne.exe --mode workers --token <CF_API_TOKEN>
+dist\CFOne.exe --mode pages   --token <CF_API_TOKEN> --password <面板密码>
+
+# 其它命令
+dist\CFOne.exe --check                       # 校验内置产物
+dist\CFOne.exe --verify <URL> --password <PW> # 校验面板是否可用
+dist\CFOne.exe --help
+```
+
+菜单功能：部署到 Workers / 部署到 Pages / 生成随机密码 / 校验产物 / 校验已部署面板。
+
+**exe 自带能力**（无需仓库其它文件）：
+- 内嵌脱敏后的 Worker 源码（单请求上传：代码 + KV 绑定 + 面板密码变量 + 兼容日期一次完成）
+- Pages 完整流程：建项目 → 写变量/KV/兼容日期 → 传占位资源（构建期算好 blake3 哈希）→ 建部署
+- 部署后自动校验面板可达性（访问 `/<密码>` 检查是否返回面板而非伪装页）
+- Token 权限不足 / 网络不通时给出明确排查提示，退出码可用于脚本判断
+
+**从源码构建 exe**：
+
+```bash
+node scripts/build.mjs      # 先产出 dist/CFOne-worker.js
+node scripts/make-exe.mjs   # 产出 dist/CFOne.exe（约 36 MiB）
+```
+
+> 打包用 `pkg`（首次运行会下载 Node 运行时，需能访问 GitHub）。产物通过 GitHub Release 分发，不入库。
+
+**exe 菜单截图式流程**：
+
+```
+  1. 部署到 Workers（推荐：单请求上传，最稳定）
+  2. 部署到 Pages（*.pages.dev 可直接测试）
+  3. 生成随机面板密码
+  4. 校验内置部署产物
+  5. 校验已部署的面板
+  0. 退出
+
+  请选择 [1]:
+  Cloudflare API Token: 
+  面板密码（留空自动生成）: 
+
+  [OK] KV: xxxxxxxxxxxx
+  [OK] Worker 已部署: cfone-xxxxxx
+  [OK] 面板可用，变量 A 已生效
+
+  ================= 部署完成 =================
+  面板地址:  https://xxx.workers.dev/<密码>
+  面板密码:  <密码>
+```
+
 ### 方式一：一键脚本（推荐）
 
 ```bash
@@ -98,15 +156,20 @@ node scripts/smoke-test.mjs   # 冒烟测试（17 项）
 
 ```
 CFOne/
-├── src/worker.js          # 源码（可读，__SFX 标记待脱敏字符串）
+├── src/worker.js            # 源码（可读，__SFX 标记待脱敏字符串）
+├── tool/
+│   ├── main.js              # exe 入口（交互菜单 + Cloudflare API 部署）
+│   └── package.json         # pkg 打包配置
 ├── scripts/
-│   ├── build.mjs          # 脱敏构建 → dist/
-│   ├── deploy.mjs         # 一键部署
-│   └── smoke-test.mjs     # 冒烟测试
+│   ├── build.mjs            # 脱敏构建 → dist/
+│   ├── make-exe.mjs         # 打包 dist/CFOne.exe
+│   ├── deploy.mjs           # Node 版一键部署
+│   └── smoke-test.mjs       # 冒烟测试（17 项）
 └── dist/
-    ├── CFOne-worker.js    # Workers 粘贴 / Pages 根文件
-    ├── _worker.js         # Pages Advanced Mode 根文件
-    └── CFOne-pages.zip    # Pages 上传包
+    ├── CFOne-worker.js      # Workers 粘贴 / Pages 根文件
+    ├── _worker.js           # Pages Advanced Mode 根文件
+    ├── CFOne-pages.zip      # Pages 上传包
+    └── CFOne.exe            # 一键部署工具（本地构建，不入库，经 Release 分发）
 ```
 
 ## 致谢

@@ -2,6 +2,14 @@
 node_modules/
 *.log
 
+# exe 构建依赖与内嵌源码（由 make-exe.mjs 生成）
+scripts/.deps/
+tool/node_modules/
+tool/worker-source.js
+
+# 打包产物不入库（36 MiB 二进制，通过 GitHub Release 分发）
+dist/CFOne.exe
+
 # 上游参考仓库（克隆用于分析，不入库）
 upstream/
 
